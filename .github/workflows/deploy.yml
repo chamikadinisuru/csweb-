@@ -1,0 +1,48 @@
+name: Build, Lint & Deploy
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  lint-and-validate:
+    name: PHP Syntax & Lint Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, gd, zip
+
+      - name: Syntax Lint Check (PHP -l)
+        run: |
+          find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \;
+
+  docker-build:
+    name: Build & Verify Docker Image
+    needs: lint-and-validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: csweb-portal:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+

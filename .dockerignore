@@ -1,0 +1,11 @@
+.git
+.github
+.gitignore
+.env
+.dockerignore
+*.md
+docker-compose*.yml
+scratch/
+.system_generated/
+*.log
+

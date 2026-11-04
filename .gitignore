@@ -1,0 +1,111 @@
+# ==============================================================================
+# Git Ignore - North Western Provincial Council Web Portal (csweb)
+# Professional Security & Clean Repository Standard
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Environment Variables & Secret Credentials (CRITICAL SECURITY)
+# ------------------------------------------------------------------------------
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+*.env
+!.env.example
+
+# Secret keys, private certificates & tokens
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_rsa*
+secrets/
+credentials.json
+auth.json
+
+# ------------------------------------------------------------------------------
+# 2. Database Dumps & Local Backups
+# ------------------------------------------------------------------------------
+*.sql
+*.sql.gz
+*.sqlite
+*.sqlite3
+*.db
+dump.rdb
+
+# ------------------------------------------------------------------------------
+# 3. Dynamic User Uploads & Media Files (Keeps repo lean & protects citizen data)
+# ------------------------------------------------------------------------------
+uploads/*
+!uploads/.htaccess
+!uploads/.gitkeep
+storage/*
+!storage/.gitkeep
+
+# ------------------------------------------------------------------------------
+# 4. Logs & Error Traces
+# ------------------------------------------------------------------------------
+*.log
+logs/
+error_log
+access_log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ------------------------------------------------------------------------------
+# 5. Operating System & System Files
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+ehthumbs_vista.db
+Thumbs.db
+Thumbs.db:encryptable
+desktop.ini
+$RECYCLE.BIN/
+
+# ------------------------------------------------------------------------------
+# 6. IDEs, Editors & Developer Tooling
+# ------------------------------------------------------------------------------
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+*~
+
+# ------------------------------------------------------------------------------
+# 7. Temporary, Scratch, Cache & Agent Artifacts
+# ------------------------------------------------------------------------------
+scratch/
+__pycache__/
+*.py[cod]
+*$py.class
+*.tmp
+*.temp
+*.bak
+styles.css.bak
+compare_keys.py
+.system_generated/
+
+# ------------------------------------------------------------------------------
+# 8. Dependency Directories
+# ------------------------------------------------------------------------------
+vendor/
+node_modules/
+.pnpm-store/
+composer.phar
