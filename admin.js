@@ -3966,13 +3966,110 @@ async function compressImageFile(file, maxWidth = 1920, maxHeight = 1920, qualit
 }
 
 
-function handleFileChosen(input) {
-  if (input.files && input.files[0]) {
-    pendingUploadFile = input.files[0];
-    const sizeMb = (pendingUploadFile.size / (1024 * 1024)).toFixed(1);
-    const prefix = currentDashboardLang === 'si' ? 'තෝරාගත් ගොනුව' : (currentDashboardLang === 'ta' ? 'தேர்ந்தெடுக்கப்பட்டது' : 'Selected');
-    document.getElementById('doc-file-label').textContent = `${prefix}: ${pendingUploadFile.name} (${sizeMb} MB)`;
-    document.getElementById('doc-size').value = `${sizeMb} MB`;
+/**
+ * Automatically compress and optimize document files (PDFs and Scanned Images)
+ * entirely inside the browser prior to uploading.
+ * 100% Client-side, 100% Free, Zero server overhead.
+ *
+ * @param {File} file - Original file chosen by user
+ * @returns {Promise<{file: File, origBytes: number, newBytes: number, savings: number, optimized: boolean}>}
+ */
+async function compressDocumentFile(file) {
+  if (!file) return { file, origBytes: 0, newBytes: 0, savings: 0, optimized: false };
+  const origBytes = file.size;
+
+  // 1. If it's an Image Document (JPG/PNG/WebP scanned circular/letter)
+  if (file.type && file.type.startsWith('image/')) {
+    const compressed = await compressImageFile(file, 1920, 1920, 0.82);
+    const newBytes = compressed.size;
+    const savings = origBytes > 0 && newBytes < origBytes ? Math.round(((origBytes - newBytes) / origBytes) * 100) : 0;
+    return {
+      file: compressed,
+      origBytes,
+      newBytes,
+      savings,
+      optimized: savings > 0
+    };
+  }
+
+  // 2. If it's a PDF Document
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  if (isPdf && window.PDFLib && window.PDFLib.PDFDocument) {
+    try {
+      const buffer = await file.arrayBuffer();
+      const pdfDoc = await window.PDFLib.PDFDocument.load(buffer, { ignoreEncryption: true });
+      const optimizedBytes = await pdfDoc.save({ useObjectStreams: true });
+      if (optimizedBytes && optimizedBytes.length > 0 && optimizedBytes.length < origBytes) {
+        const compressedFile = new File([optimizedBytes], file.name, {
+          type: 'application/pdf',
+          lastModified: Date.now()
+        });
+        const savings = Math.round(((origBytes - compressedFile.size) / origBytes) * 100);
+        console.log(`[PDF Compression] Client-optimized ${file.name}: ${(origBytes / 1024).toFixed(1)} KB -> ${(compressedFile.size / 1024).toFixed(1)} KB (-${savings}%)`);
+        return {
+          file: compressedFile,
+          origBytes,
+          newBytes: compressedFile.size,
+          savings,
+          optimized: true
+        };
+      }
+    } catch (pdfErr) {
+      console.warn("Client-side PDF optimization fallback:", pdfErr);
+    }
+  }
+
+  // Fallback: Return original
+  return {
+    file,
+    origBytes,
+    newBytes: origBytes,
+    savings: 0,
+    optimized: false
+  };
+}
+
+
+async function handleFileChosen(input) {
+  if (!input.files || !input.files[0]) return;
+  const rawFile = input.files[0];
+  const labelEl = document.getElementById('doc-file-label');
+  const sizeInput = document.getElementById('doc-size');
+
+  const lang = currentDashboardLang || 'en';
+  const optimizingText = lang === 'si' 
+    ? '⚡ ගොනුව Browser එකෙන්ම Compress වෙමින් පවතී... ⏳' 
+    : (lang === 'ta' ? '⚡ ஆவணம் சுருக்கப்படுகிறது... ⏳' : '⚡ Optimizing document in browser... ⏳');
+  if (labelEl) labelEl.textContent = optimizingText;
+
+  // Run client-side optimization immediately upon selection
+  const result = await compressDocumentFile(rawFile);
+  pendingUploadFile = result.file;
+
+  const formatSize = (bytes) => {
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+    return Math.round(bytes / 1024) + ' KB';
+  };
+
+  const origStr = formatSize(result.origBytes);
+  const newStr = formatSize(result.newBytes);
+
+  if (result.optimized) {
+    const savedStr = lang === 'si' 
+      ? `${result.savings}% ඉතිරියි` 
+      : (lang === 'ta' ? `${result.savings}% சேமிக்கப்பட்டது` : `-${result.savings}% saved`);
+    if (labelEl) {
+      labelEl.innerHTML = `<span style="color:#059669; font-weight:700;">✅ ${rawFile.name}</span> <span style="font-size:0.75rem; color:#475569;">(${origStr} ➔ ⚡ <strong>${newStr}</strong> | ${savedStr})</span>`;
+    }
+  } else {
+    const prefix = lang === 'si' ? 'තෝරාගත් ගොනුව' : (lang === 'ta' ? 'தேர்ந்தெடுக்கப்பட்டது' : 'Selected');
+    if (labelEl) {
+      labelEl.textContent = `${prefix}: ${rawFile.name} (${newStr})`;
+    }
+  }
+
+  if (sizeInput) {
+    sizeInput.value = newStr;
   }
 }
 
@@ -5369,12 +5466,30 @@ async function handleDeleteSystem(id) {
 let pendingProjectFile = null;
 
 
-function handleProjectImageSelect(input) {
+async function handleProjectImageSelect(input) {
   if (input.files && input.files[0]) {
-    pendingProjectFile = input.files[0];
-    const sizeMb = (pendingProjectFile.size / (1024 * 1024)).toFixed(1);
+    const rawFile = input.files[0];
     const label = document.getElementById('project-image-label');
-    if (label) label.textContent = `Selected: ${pendingProjectFile.name} (${sizeMb} MB)`;
+    const lang = currentDashboardLang || 'en';
+    const optText = lang === 'si' ? '⚡ පින්තූරය Compress වෙමින් පවතී... ⏳' : (lang === 'ta' ? '⚡ படம் சுருக்கப்படுகிறது... ⏳' : '⚡ Optimizing image in browser... ⏳');
+    if (label) label.textContent = optText;
+
+    const compressed = await compressImageFile(rawFile, 1920, 1920, 0.82);
+    pendingProjectFile = compressed;
+
+    const formatSize = (bytes) => (bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.round(bytes / 1024) + ' KB');
+    const origStr = formatSize(rawFile.size);
+    const newStr = formatSize(compressed.size);
+
+    if (label) {
+      if (compressed.size < rawFile.size) {
+        const savings = Math.round(((rawFile.size - compressed.size) / rawFile.size) * 100);
+        const saveLabel = lang === 'si' ? `${savings}% ඉතිරියි` : (lang === 'ta' ? `${savings}% சேமிக்கப்பட்டது` : `-${savings}% saved`);
+        label.innerHTML = `<span style="color:#059669; font-weight:700;">✅ ${rawFile.name}</span> <span style="font-size:0.75rem; color:#475569;">(${origStr} ➔ ⚡ <strong>${newStr}</strong> | ${saveLabel})</span>`;
+      } else {
+        label.textContent = `✅ Selected: ${rawFile.name} (${newStr})`;
+      }
+    }
   }
 }
 

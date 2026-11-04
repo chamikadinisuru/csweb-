@@ -5243,8 +5243,11 @@ require_once __DIR__ . '/config.php';
   </div>
 
 
+  <!-- Client-side PDF Optimization Engine (100% Free & Standalone) -->
+  <script src="assets/pdf-lib.min.js"></script>
+
   <!-- Include Core Admin Script -->
-  <script src="admin.js?v=85.0"></script>
+  <script src="admin.js?v=86.0"></script>
   <!-- ======================================================================
        MODAL: CHANGE ACCOUNT PASSWORD (POPUP WINDOW)
        ====================================================================== -->
