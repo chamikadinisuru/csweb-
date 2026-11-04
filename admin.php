@@ -5244,7 +5244,7 @@ require_once __DIR__ . '/config.php';
 
 
   <!-- Include Core Admin Script -->
-  <script src="admin.js?v=84.0"></script>
+  <script src="admin.js?v=85.0"></script>
   <!-- ======================================================================
        MODAL: CHANGE ACCOUNT PASSWORD (POPUP WINDOW)
        ====================================================================== -->

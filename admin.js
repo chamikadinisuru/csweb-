@@ -3880,6 +3880,92 @@ function openEditDocModal(id) {
 }
 
 
+/**
+ * Automatically compress and downscale an image file using browser Canvas before upload.
+ * Reduces bandwidth usage, accelerates upload speeds, and avoids server file limit errors.
+ *
+ * @param {File} file - The original File object from <input type="file">
+ * @param {number} maxWidth - Maximum width in pixels (default: 1920)
+ * @param {number} maxHeight - Maximum height in pixels (default: 1920)
+ * @param {number} quality - Compression quality between 0.1 and 1.0 (default: 0.82)
+ * @returns {Promise<File>} - Resolves with compressed File, or original if compression is not beneficial
+ */
+async function compressImageFile(file, maxWidth = 1920, maxHeight = 1920, quality = 0.82) {
+  if (!file || !file.type || !file.type.startsWith('image/')) {
+    return file;
+  }
+  if (file.type === 'image/svg+xml' || file.type === 'image/gif') {
+    return file;
+  }
+  if (file.size < 250 * 1024) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (!width || !height) {
+          return resolve(file);
+        }
+
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return resolve(file);
+        }
+
+        const isPng = file.type === 'image/png';
+        const mimeType = isPng ? 'image/png' : 'image/jpeg';
+        if (!isPng) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (blob && blob.size > 0 && blob.size < file.size) {
+            const compressedFile = new File([blob], file.name, {
+              type: mimeType,
+              lastModified: Date.now()
+            });
+            console.log(`[Compression] Client-optimized ${file.name}: ${(file.size / 1024).toFixed(1)} KB -> ${(compressedFile.size / 1024).toFixed(1)} KB`);
+            resolve(compressedFile);
+          } else {
+            resolve(file);
+          }
+        }, mimeType, quality);
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file);
+      };
+
+      img.src = objectUrl;
+    } catch (err) {
+      console.warn("Client-side image compression fallback:", err);
+      resolve(file);
+    }
+  });
+}
+
+
 function handleFileChosen(input) {
   if (input.files && input.files[0]) {
     pendingUploadFile = input.files[0];
@@ -4093,10 +4179,14 @@ async function handleSaveDocument(e) {
   let uploadedSize = '';
 
 
-  // Upload file if new file chosen
+  // Upload file if new file chosen (with auto image optimization)
   if (pendingUploadFile) {
+    let fileToUpload = pendingUploadFile;
+    if (fileToUpload.type && fileToUpload.type.startsWith('image/')) {
+      fileToUpload = await compressImageFile(fileToUpload);
+    }
     const formData = new FormData();
-    formData.append('file', pendingUploadFile);
+    formData.append('file', fileToUpload);
     if (currentUser && currentUser.username) {
       formData.append('username', currentUser.username);
     }
@@ -5365,8 +5455,12 @@ async function handleSaveProject(e) {
 
   let uploadedUrl = '';
   if (pendingProjectFile) {
+    let fileToUpload = pendingProjectFile;
+    if (fileToUpload.type && fileToUpload.type.startsWith('image/')) {
+      fileToUpload = await compressImageFile(fileToUpload);
+    }
     const formData = new FormData();
-    formData.append('file', pendingProjectFile);
+    formData.append('file', fileToUpload);
     if (currentUser && currentUser.username) {
       formData.append('username', currentUser.username);
     }
@@ -6488,8 +6582,12 @@ async function handleProfilePhotoSelected(event) {
   }
 
 
+  let fileToUpload = file;
+  if (fileToUpload.type && fileToUpload.type.startsWith('image/')) {
+    fileToUpload = await compressImageFile(fileToUpload, 800, 800, 0.85);
+  }
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', fileToUpload);
   if (currentUser.username) {
     formData.append('username', currentUser.username);
   }
